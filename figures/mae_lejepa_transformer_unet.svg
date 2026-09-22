@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1180" viewBox="0 0 1800 1180">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f8fbff"/><stop offset="1" stop-color="#ffffff"/></linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#17365d" flood-opacity=".12"/></filter>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6 Z" fill="#46637f"/></marker>
+    <style>
+      .title{font:700 29px 'Microsoft YaHei',Arial,sans-serif;fill:#17365d}.panel-title{font:700 20px 'Microsoft YaHei',Arial,sans-serif;fill:#17365d}
+      .label{font:600 15px 'Microsoft YaHei',Arial,sans-serif;fill:#263b50}.small{font:400 13px 'Microsoft YaHei',Arial,sans-serif;fill:#3e5265}.note{font:600 14px 'Microsoft YaHei',Arial,sans-serif;fill:#536777}
+      .box{stroke-width:2;rx:14;filter:url(#shadow)}.arrow{fill:none;stroke:#46637f;stroke-width:2.2;marker-end:url(#arrow)}.dash{stroke-dasharray:8 6}
+    </style>
+  </defs>
+  <rect width="1800" height="1180" fill="url(#bg)"/>
+  <text x="900" y="48" text-anchor="middle" class="title">MAE 与 LeJEPA：Transformer / U-Net 架构对比</text>
+
+  <!-- Panel 1 -->
+  <g transform="translate(35 75)">
+    <rect width="850" height="470" rx="22" fill="#f7faff" stroke="#6c8ebf" stroke-width="2.5"/>
+    <rect width="850" height="48" rx="22" fill="#dae8fc"/><path d="M0 28h850v20H0z" fill="#dae8fc"/>
+    <text x="24" y="32" class="panel-title">① MAE + Transformer</text>
+    <rect class="box" x="24" y="108" width="118" height="70" fill="#d5e8d4" stroke="#82b366"/><text x="83" y="137" text-anchor="middle" class="label">输入光谱 x</text><text x="83" y="158" text-anchor="middle" class="small">(B, L)</text>
+    <rect class="box" x="174" y="98" width="145" height="90" fill="#fff2cc" stroke="#d6b656"/><text x="246" y="129" text-anchor="middle" class="label">Patchify + Mask</text><text x="246" y="151" text-anchor="middle" class="small">遮挡 patch</text><text x="246" y="171" text-anchor="middle" class="small">→ mask token</text>
+    <rect class="box" x="355" y="78" width="190" height="130" fill="#e1d5e7" stroke="#9673a6"/><text x="450" y="111" text-anchor="middle" class="label">Transformer Encoder</text><text x="450" y="138" text-anchor="middle" class="small">Patch projection + 位置编码</text><text x="450" y="161" text-anchor="middle" class="small">Self-Attention + MLP</text><text x="450" y="184" text-anchor="middle" class="small">× depth</text>
+    <rect class="box" x="585" y="78" width="190" height="130" fill="#ffe6cc" stroke="#d79b00"/><text x="680" y="111" text-anchor="middle" class="label">MLP Patch Decoder</text><text x="680" y="139" text-anchor="middle" class="small">Linear → GELU → Linear</text><text x="680" y="165" text-anchor="middle" class="small">token → patch_size</text>
+    <path class="arrow" d="M142 143H174"/><path class="arrow" d="M319 143H355"/><path class="arrow" d="M545 143H585"/>
+    <text x="565" y="128" text-anchor="middle" class="small">tokens</text>
+    <rect class="box" x="590" y="253" width="180" height="66" fill="#d5e8d4" stroke="#82b366"/><text x="680" y="281" text-anchor="middle" class="label">重建被遮挡 patch</text><text x="680" y="302" text-anchor="middle" class="small">reconstructed patches</text>
+    <path class="arrow" d="M680 208V253"/>
+    <ellipse cx="680" cy="389" rx="91" ry="39" fill="#f8cecc" stroke="#b85450" stroke-width="2"/><text x="680" y="382" text-anchor="middle" class="label">MAE Loss</text><text x="680" y="404" text-anchor="middle" class="small">masked-patch MSE</text><path class="arrow" d="M680 319V350"/>
+    <rect x="260" y="273" width="260" height="70" rx="12" fill="#eef5ff" stroke="#6c8ebf" stroke-width="2" stroke-dasharray="7 5"/><text x="390" y="301" text-anchor="middle" class="note">冻结 Encoder pooled embedding</text><text x="390" y="324" text-anchor="middle" class="small">→ Ridge 属性预测</text><path class="arrow dash" d="M450 208V273"/>
+  </g>
+
+  <!-- Panel 2 -->
+  <g transform="translate(915 75)">
+    <rect width="850" height="470" rx="22" fill="#f7fff8" stroke="#82b366" stroke-width="2.5"/>
+    <rect width="850" height="48" rx="22" fill="#d5e8d4"/><path d="M0 28h850v20H0z" fill="#d5e8d4"/><text x="24" y="32" class="panel-title">② MAE + U-Net</text>
+    <rect class="box" x="24" y="108" width="118" height="70" fill="#d5e8d4" stroke="#82b366"/><text x="83" y="137" text-anchor="middle" class="label">输入光谱 x</text><text x="83" y="158" text-anchor="middle" class="small">(B, L)</text>
+    <rect class="box" x="174" y="98" width="145" height="90" fill="#fff2cc" stroke="#d6b656"/><text x="246" y="129" text-anchor="middle" class="label">Patchify + Mask</text><text x="246" y="151" text-anchor="middle" class="small">遮挡区域</text><text x="246" y="171" text-anchor="middle" class="small">→ mask value</text>
+    <rect class="box" x="355" y="78" width="190" height="130" fill="#dae8fc" stroke="#6c8ebf"/><text x="450" y="111" text-anchor="middle" class="label">U-Net Encoder</text><text x="450" y="139" text-anchor="middle" class="small">enc1 → enc2</text><text x="450" y="164" text-anchor="middle" class="small">→ bottleneck</text><text x="450" y="188" text-anchor="middle" class="small">Conv1D + 下采样</text>
+    <rect class="box" x="585" y="78" width="190" height="130" fill="#d5e8d4" stroke="#82b366"/><text x="680" y="111" text-anchor="middle" class="label">U-Net Decoder</text><text x="680" y="139" text-anchor="middle" class="small">up → skip connection</text><text x="680" y="164" text-anchor="middle" class="small">→ dec → output</text>
+    <path class="arrow" d="M142 143H174"/><path class="arrow" d="M319 143H355"/><path class="arrow" d="M545 143H585"/><text x="565" y="128" text-anchor="middle" class="small">bottleneck</text>
+    <path class="arrow dash" stroke="#5b9b5b" d="M450 78V58H680V78"/><text x="565" y="52" text-anchor="middle" class="small">skip features</text>
+    <rect class="box" x="590" y="253" width="180" height="66" fill="#d5e8d4" stroke="#82b366"/><text x="680" y="281" text-anchor="middle" class="label">重建完整光谱</text><text x="680" y="302" text-anchor="middle" class="small">恢复 patch 形状</text><path class="arrow" d="M680 208V253"/>
+    <ellipse cx="680" cy="389" rx="91" ry="39" fill="#f8cecc" stroke="#b85450" stroke-width="2"/><text x="680" y="382" text-anchor="middle" class="label">MAE Loss</text><text x="680" y="404" text-anchor="middle" class="small">masked-patch MSE</text><path class="arrow" d="M680 319V350"/>
+    <rect x="250" y="273" width="280" height="70" rx="12" fill="#eef5ff" stroke="#6c8ebf" stroke-width="2" stroke-dasharray="7 5"/><text x="390" y="301" text-anchor="middle" class="note">冻结 Encoder bottleneck/tokens</text><text x="390" y="324" text-anchor="middle" class="small">pooled → Ridge 属性预测</text><path class="arrow dash" d="M450 208V273"/>
+  </g>
+
+  <!-- Panel 3 -->
+  <g transform="translate(35 575)">
+    <rect width="850" height="470" rx="22" fill="#fcf9ff" stroke="#9673a6" stroke-width="2.5"/>
+    <rect width="850" height="48" rx="22" fill="#e1d5e7"/><path d="M0 28h850v20H0z" fill="#e1d5e7"/><text x="24" y="32" class="panel-title">③ LeJEPA + Transformer</text>
+    <rect class="box" x="20" y="103" width="130" height="80" fill="#d5e8d4" stroke="#82b366"/><text x="85" y="132" text-anchor="middle" class="label">同一光谱多视图</text><text x="85" y="157" text-anchor="middle" class="small">x + view masks</text>
+    <rect class="box" x="180" y="93" width="145" height="100" fill="#fff2cc" stroke="#d6b656"/><text x="252" y="124" text-anchor="middle" class="label">视图遮挡</text><text x="252" y="149" text-anchor="middle" class="small">每个 mask</text><text x="252" y="171" text-anchor="middle" class="small">生成一个视图</text>
+    <rect class="box" x="355" y="73" width="195" height="140" fill="#e1d5e7" stroke="#9673a6"/><text x="452" y="106" text-anchor="middle" class="label">共享 Transformer Encoder</text><text x="452" y="135" text-anchor="middle" class="small">每个视图分别编码</text><text x="452" y="160" text-anchor="middle" class="small">Self-Attention + MLP</text><text x="452" y="185" text-anchor="middle" class="small">visible-token pooling</text>
+    <rect class="box" x="590" y="73" width="190" height="140" fill="#ffe6cc" stroke="#d79b00"/><text x="685" y="106" text-anchor="middle" class="label">Predictor / Projector</text><text x="685" y="136" text-anchor="middle" class="small">Linear → GELU → Linear</text><text x="685" y="163" text-anchor="middle" class="small">embedding</text><text x="685" y="185" text-anchor="middle" class="small">→ projection_dim</text>
+    <path class="arrow" d="M150 143H180"/><path class="arrow" d="M325 143H355"/><path class="arrow" d="M550 143H590"/><text x="570" y="128" text-anchor="middle" class="small">pooled embedding</text>
+    <rect class="box" x="590" y="253" width="190" height="68" fill="#dae8fc" stroke="#6c8ebf"/><text x="685" y="281" text-anchor="middle" class="label">跨视图 latent 对齐</text><text x="685" y="303" text-anchor="middle" class="small">projected representations</text><path class="arrow" d="M685 213V253"/>
+    <ellipse cx="685" cy="392" rx="105" ry="42" fill="#f8cecc" stroke="#b85450" stroke-width="2"/><text x="685" y="383" text-anchor="middle" class="label">LeJEPA Loss</text><text x="685" y="406" text-anchor="middle" class="small">(1−λ) MSE + λ SIGReg</text><path class="arrow" d="M685 321V350"/>
+    <rect x="250" y="257" width="280" height="68" rx="12" fill="#eef5ff" stroke="#6c8ebf" stroke-width="2" stroke-dasharray="7 5"/><text x="390" y="285" text-anchor="middle" class="note">冻结 Encoder pooled embedding</text><text x="390" y="307" text-anchor="middle" class="small">→ Ridge 属性预测</text><path class="arrow dash" d="M452 213V257"/>
+    <rect x="250" y="367" width="250" height="54" rx="12" fill="#f5f5f5" stroke="#666" stroke-width="2" stroke-dasharray="7 5"/><text x="375" y="400" text-anchor="middle" class="note">不使用 decoder，不做输入重建</text>
+  </g>
+
+  <!-- Panel 4 -->
+  <g transform="translate(915 575)">
+    <rect width="850" height="470" rx="22" fill="#fffcf7" stroke="#d79b00" stroke-width="2.5"/>
+    <rect width="850" height="48" rx="22" fill="#ffe6cc"/><path d="M0 28h850v20H0z" fill="#ffe6cc"/><text x="24" y="32" class="panel-title">④ LeJEPA + U-Net</text>
+    <rect class="box" x="20" y="103" width="130" height="80" fill="#d5e8d4" stroke="#82b366"/><text x="85" y="132" text-anchor="middle" class="label">同一光谱多视图</text><text x="85" y="157" text-anchor="middle" class="small">x + view masks</text>
+    <rect class="box" x="180" y="93" width="145" height="100" fill="#fff2cc" stroke="#d6b656"/><text x="252" y="124" text-anchor="middle" class="label">视图遮挡</text><text x="252" y="149" text-anchor="middle" class="small">遮挡区域</text><text x="252" y="171" text-anchor="middle" class="small">→ mask value</text>
+    <rect class="box" x="355" y="73" width="195" height="140" fill="#dae8fc" stroke="#6c8ebf"/><text x="452" y="106" text-anchor="middle" class="label">共享 U-Net Encoder</text><text x="452" y="135" text-anchor="middle" class="small">enc1 → enc2</text><text x="452" y="160" text-anchor="middle" class="small">→ bottleneck</text><text x="452" y="185" text-anchor="middle" class="small">仅使用编码路径</text>
+    <rect class="box" x="590" y="73" width="190" height="140" fill="#ffe6cc" stroke="#d79b00"/><text x="685" y="106" text-anchor="middle" class="label">Predictor / Projector</text><text x="685" y="136" text-anchor="middle" class="small">Linear → GELU → Linear</text><text x="685" y="163" text-anchor="middle" class="small">与 Transformer 情况</text><text x="685" y="185" text-anchor="middle" class="small">保持相同</text>
+    <path class="arrow" d="M150 143H180"/><path class="arrow" d="M325 143H355"/><path class="arrow" d="M550 143H590"/><text x="570" y="128" text-anchor="middle" class="small">pooled embedding</text>
+    <rect class="box" x="590" y="253" width="190" height="68" fill="#dae8fc" stroke="#6c8ebf"/><text x="685" y="281" text-anchor="middle" class="label">跨视图 latent 对齐</text><text x="685" y="303" text-anchor="middle" class="small">projected representations</text><path class="arrow" d="M685 213V253"/>
+    <ellipse cx="685" cy="392" rx="105" ry="42" fill="#f8cecc" stroke="#b85450" stroke-width="2"/><text x="685" y="383" text-anchor="middle" class="label">LeJEPA Loss</text><text x="685" y="406" text-anchor="middle" class="small">(1−λ) MSE + λ SIGReg</text><path class="arrow" d="M685 321V350"/>
+    <rect x="250" y="257" width="280" height="68" rx="12" fill="#eef5ff" stroke="#6c8ebf" stroke-width="2" stroke-dasharray="7 5"/><text x="390" y="285" text-anchor="middle" class="note">冻结 Encoder pooled embedding</text><text x="390" y="307" text-anchor="middle" class="small">→ Ridge 属性预测</text><path class="arrow dash" d="M452 213V257"/>
+    <rect x="250" y="367" width="250" height="54" rx="12" fill="#f5f5f5" stroke="#666" stroke-width="2" stroke-dasharray="7 5"/><text x="375" y="389" text-anchor="middle" class="note">U-Net decoder 不参与 LeJEPA</text><text x="375" y="410" text-anchor="middle" class="small">不做光谱重建</text>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(375 1080)">
+    <rect width="1050" height="70" rx="16" fill="#fff" stroke="#9aa9b6" stroke-width="1.5"/>
+    <text x="25" y="42" class="label">图例</text>
+    <rect x="85" y="20" width="105" height="32" rx="8" fill="#d5e8d4" stroke="#82b366"/><text x="137" y="41" text-anchor="middle" class="small">输入/输出</text>
+    <rect x="210" y="20" width="105" height="32" rx="8" fill="#fff2cc" stroke="#d6b656"/><text x="262" y="41" text-anchor="middle" class="small">Mask/视图</text>
+    <rect x="335" y="20" width="115" height="32" rx="8" fill="#e1d5e7" stroke="#9673a6"/><text x="392" y="41" text-anchor="middle" class="small">Transformer</text>
+    <rect x="470" y="20" width="120" height="32" rx="8" fill="#dae8fc" stroke="#6c8ebf"/><text x="530" y="41" text-anchor="middle" class="small">U-Net/表征</text>
+    <rect x="610" y="20" width="155" height="32" rx="8" fill="#ffe6cc" stroke="#d79b00"/><text x="687" y="41" text-anchor="middle" class="small">Decoder/Projector</text>
+    <rect x="785" y="20" width="105" height="32" rx="8" fill="#f8cecc" stroke="#b85450"/><text x="837" y="41" text-anchor="middle" class="small">训练损失</text>
+    <rect x="910" y="20" width="115" height="32" rx="8" fill="#f5f5f5" stroke="#666" stroke-dasharray="5 4"/><text x="967" y="41" text-anchor="middle" class="small">未使用模块</text>
+  </g>
+</svg>

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="MAE-LeJEPA架构对比">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1800" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <mxCell id="title" value="MAE 与 LeJEPA：Transformer / U-Net 架构对比" style="text;html=1;align=center;verticalAlign=middle;fontSize=24;fontStyle=1;fontColor=#17365D;" vertex="1" parent="1">
+          <mxGeometry x="300" y="20" width="1200" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="p1" value="① MAE + Transformer" style="swimlane;startSize=42;rounded=1;html=1;fontSize=17;fontStyle=1;fillColor=#F7FAFF;strokeColor=#6C8EBF;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="840" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="p2" value="② MAE + U-Net" style="swimlane;startSize=42;rounded=1;html=1;fontSize=17;fontStyle=1;fillColor=#F7FFF8;strokeColor=#82B366;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="920" y="80" width="840" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="p3" value="③ LeJEPA + Transformer" style="swimlane;startSize=42;rounded=1;html=1;fontSize=17;fontStyle=1;fillColor=#FCF9FF;strokeColor=#9673A6;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="40" y="570" width="840" height="450" as="geometry"/>
+        </mxCell>
+        <mxCell id="p4" value="④ LeJEPA + U-Net" style="swimlane;startSize=42;rounded=1;html=1;fontSize=17;fontStyle=1;fillColor=#FFFCF7;strokeColor=#D79B00;strokeWidth=2;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="920" y="570" width="840" height="450" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="mti" value="输入光谱 x&#xa;(B, L)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=13;" vertex="1" parent="p1"><mxGeometry x="30" y="90" width="110" height="65" as="geometry"/></mxCell>
+        <mxCell id="mtm" value="Patchify + Mask&#xa;被遮挡 patch → mask token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="p1"><mxGeometry x="175" y="80" width="150" height="85" as="geometry"/></mxCell>
+        <mxCell id="mte" value="Transformer Encoder&#xa;Patch projection + 位置编码&#xa;Self-Attention + MLP × depth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;fontStyle=1;" vertex="1" parent="p1"><mxGeometry x="365" y="65" width="190" height="115" as="geometry"/></mxCell>
+        <mxCell id="mtd" value="MLP Patch Decoder&#xa;Linear → GELU → Linear&#xa;每个 token → patch_size" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;fontStyle=1;" vertex="1" parent="p1"><mxGeometry x="595" y="65" width="180" height="115" as="geometry"/></mxCell>
+        <mxCell id="mto" value="重建被遮挡 patch" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="p1"><mxGeometry x="615" y="230" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="mtl" value="MAE Loss&#xa;masked-patch MSE" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;fontStyle=1;" vertex="1" parent="p1"><mxGeometry x="620" y="330" width="130" height="60" as="geometry"/></mxCell>
+        <mxCell id="mtz" value="冻结评估时：Encoder pooled embedding → Ridge 属性预测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;" vertex="1" parent="p1"><mxGeometry x="260" y="245" width="270" height="65" as="geometry"/></mxCell>
+
+        <mxCell id="mui" value="输入光谱 x&#xa;(B, L)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=13;" vertex="1" parent="p2"><mxGeometry x="30" y="90" width="110" height="65" as="geometry"/></mxCell>
+        <mxCell id="mum" value="Patchify + Mask&#xa;被遮挡区域 → mask value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="p2"><mxGeometry x="175" y="80" width="150" height="85" as="geometry"/></mxCell>
+        <mxCell id="mue" value="U-Net Encoder&#xa;enc1 → enc2 → bottleneck&#xa;Conv1D + GELU + 下采样" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;fontStyle=1;" vertex="1" parent="p2"><mxGeometry x="365" y="65" width="180" height="115" as="geometry"/></mxCell>
+        <mxCell id="mud" value="U-Net Decoder&#xa;up → skip connection&#xa;→ dec → output" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;fontStyle=1;" vertex="1" parent="p2"><mxGeometry x="595" y="65" width="180" height="115" as="geometry"/></mxCell>
+        <mxCell id="muo" value="重建完整光谱&#xa;并恢复 patch 形状" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="p2"><mxGeometry x="615" y="230" width="140" height="60" as="geometry"/></mxCell>
+        <mxCell id="mul" value="MAE Loss&#xa;masked-patch MSE" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;fontStyle=1;" vertex="1" parent="p2"><mxGeometry x="620" y="330" width="130" height="60" as="geometry"/></mxCell>
+        <mxCell id="muz" value="冻结评估时：Encoder bottleneck/tokens pooled → Ridge 属性预测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;" vertex="1" parent="p2"><mxGeometry x="255" y="245" width="290" height="65" as="geometry"/></mxCell>
+        <mxCell id="muskip" value="跳跃连接" style="text;html=1;align=center;fontSize=11;fontColor=#508A50;" vertex="1" parent="p2"><mxGeometry x="515" y="40" width="110" height="25" as="geometry"/></mxCell>
+
+        <mxCell id="jti" value="同一光谱的多视图&#xa;x + view masks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="p3"><mxGeometry x="25" y="90" width="125" height="70" as="geometry"/></mxCell>
+        <mxCell id="jtv" value="每个 mask 生成一个视图&#xa;可见 patch 保留" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="p3"><mxGeometry x="180" y="80" width="145" height="90" as="geometry"/></mxCell>
+        <mxCell id="jte" value="共享 Transformer Encoder&#xa;每个视图分别编码&#xa;visible-token pooled embedding" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=12;fontStyle=1;" vertex="1" parent="p3"><mxGeometry x="365" y="65" width="190" height="115" as="geometry"/></mxCell>
+        <mxCell id="jtp" value="Predictor / Projector&#xa;Linear → GELU → Linear&#xa;embedding → projection_dim" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;fontStyle=1;" vertex="1" parent="p3"><mxGeometry x="595" y="65" width="180" height="115" as="geometry"/></mxCell>
+        <mxCell id="jta" value="跨视图 latent 对齐&#xa;projected representations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="p3"><mxGeometry x="595" y="225" width="180" height="65" as="geometry"/></mxCell>
+        <mxCell id="jtl" value="LeJEPA Loss&#xa;(1−λ) Invariance MSE + λ SIGReg" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=11;fontStyle=1;" vertex="1" parent="p3"><mxGeometry x="600" y="330" width="170" height="65" as="geometry"/></mxCell>
+        <mxCell id="jtn" value="不使用 decoder；不做输入重建" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;dashed=1;" vertex="1" parent="p3"><mxGeometry x="250" y="340" width="245" height="50" as="geometry"/></mxCell>
+        <mxCell id="jtz" value="下游：冻结 Encoder pooled embedding → Ridge 属性预测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;" vertex="1" parent="p3"><mxGeometry x="250" y="245" width="280" height="65" as="geometry"/></mxCell>
+
+        <mxCell id="jui" value="同一光谱的多视图&#xa;x + view masks" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;" vertex="1" parent="p4"><mxGeometry x="25" y="90" width="125" height="70" as="geometry"/></mxCell>
+        <mxCell id="juv" value="每个 mask 生成一个视图&#xa;遮挡区域 → mask value" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;" vertex="1" parent="p4"><mxGeometry x="180" y="80" width="145" height="90" as="geometry"/></mxCell>
+        <mxCell id="jue" value="共享 U-Net Encoder&#xa;enc1 → enc2 → bottleneck&#xa;仅使用编码路径" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;fontStyle=1;" vertex="1" parent="p4"><mxGeometry x="365" y="65" width="190" height="115" as="geometry"/></mxCell>
+        <mxCell id="jup" value="Predictor / Projector&#xa;Linear → GELU → Linear&#xa;结构与 Transformer 情况相同" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;fontStyle=1;" vertex="1" parent="p4"><mxGeometry x="595" y="65" width="180" height="115" as="geometry"/></mxCell>
+        <mxCell id="jua" value="跨视图 latent 对齐&#xa;projected representations" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;" vertex="1" parent="p4"><mxGeometry x="595" y="225" width="180" height="65" as="geometry"/></mxCell>
+        <mxCell id="jul" value="LeJEPA Loss&#xa;(1−λ) Invariance MSE + λ SIGReg" style="ellipse;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=11;fontStyle=1;" vertex="1" parent="p4"><mxGeometry x="600" y="330" width="170" height="65" as="geometry"/></mxCell>
+        <mxCell id="jun" value="U-Net decoder 不参与 LeJEPA&#xa;不做光谱重建" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#666666;fontSize=12;dashed=1;" vertex="1" parent="p4"><mxGeometry x="250" y="340" width="245" height="50" as="geometry"/></mxCell>
+        <mxCell id="juz" value="下游：冻结 Encoder pooled embedding → Ridge 属性预测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=12;dashed=1;" vertex="1" parent="p4"><mxGeometry x="250" y="245" width="280" height="65" as="geometry"/></mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p1" source="mti" target="mtm"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p1" source="mtm" target="mte"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" value="encoded tokens" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;labelBackgroundColor=#FFFFFF;fontSize=10;" edge="1" parent="p1" source="mte" target="mtd"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p1" source="mtd" target="mto"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p1" source="mto" target="mtl"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;dashed=1;" edge="1" parent="p1" source="mte" target="mtz"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p2" source="mui" target="mum"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p2" source="mum" target="mue"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" value="bottleneck" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;labelBackgroundColor=#FFFFFF;fontSize=10;" edge="1" parent="p2" source="mue" target="mud"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" value="skip features" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;dashed=1;curved=1;strokeColor=#82B366;labelBackgroundColor=#FFFFFF;fontSize=10;" edge="1" parent="p2" source="mue" target="mud"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="455" y="45"/><mxPoint x="685" y="45"/></Array></mxGeometry></mxCell>
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p2" source="mud" target="muo"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p2" source="muo" target="mul"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;dashed=1;" edge="1" parent="p2" source="mue" target="muz"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p3" source="jti" target="jtv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p3" source="jtv" target="jte"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e16" value="pooled embedding" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;labelBackgroundColor=#FFFFFF;fontSize=10;" edge="1" parent="p3" source="jte" target="jtp"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p3" source="jtp" target="jta"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p3" source="jta" target="jtl"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;dashed=1;" edge="1" parent="p3" source="jte" target="jtz"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="e20" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p4" source="jui" target="juv"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e21" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p4" source="juv" target="jue"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e22" value="pooled embedding" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;labelBackgroundColor=#FFFFFF;fontSize=10;" edge="1" parent="p4" source="jue" target="jup"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p4" source="jup" target="jua"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e24" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;" edge="1" parent="p4" source="jua" target="jul"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;dashed=1;" edge="1" parent="p4" source="jue" target="juz"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+        <mxCell id="legend" value="颜色图例" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;fontStyle=1;fillColor=#FFFFFF;strokeColor=#999999;container=1;" vertex="1" parent="1"><mxGeometry x="470" y="1050" width="860" height="95" as="geometry"/></mxCell>
+        <mxCell id="lg1" value="输入/输出" style="rounded=1;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="20" y="38" width="110" height="35" as="geometry"/></mxCell>
+        <mxCell id="lg2" value="Mask/视图" style="rounded=1;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="155" y="38" width="110" height="35" as="geometry"/></mxCell>
+        <mxCell id="lg3" value="Transformer" style="rounded=1;html=1;fillColor=#E1D5E7;strokeColor=#9673A6;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="290" y="38" width="110" height="35" as="geometry"/></mxCell>
+        <mxCell id="lg4" value="U-Net/表征" style="rounded=1;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="425" y="38" width="110" height="35" as="geometry"/></mxCell>
+        <mxCell id="lg5" value="Decoder/Projector" style="rounded=1;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="560" y="38" width="130" height="35" as="geometry"/></mxCell>
+        <mxCell id="lg6" value="训练损失" style="rounded=1;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=11;" vertex="1" parent="legend"><mxGeometry x="715" y="38" width="110" height="35" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

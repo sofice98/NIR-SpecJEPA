@@ -1,0 +1,3 @@
+# 兼容旧路径的入口配置；新的配置按职责拆分到 datasets/ 和 experiments/。
+dataset: datasets/crude_oil_private.yaml
+experiment: experiments/e1a_representation_quality.yaml

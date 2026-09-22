@@ -1,0 +1,11 @@
+name: crude_oil_private
+adapter: data.crude_oil_private.adapter:load_dataset
+root: data/crude_oil_private
+groups:
+  oil1:
+    density_unit: g/cm3
+  oil2:
+    density_unit: g/cm3
+canonical:
+  density_unit: g/cm3
+  resampling: common_coarse_grid_linear

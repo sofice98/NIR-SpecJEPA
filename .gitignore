@@ -1,0 +1,28 @@
+.venv/
+.conda_envs/
+.conda_pkgs/
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Coverage and test reports
+.coverage
+.coverage.*
+htmlcov/
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+
+# Local data files
+*.[cC][sS][vV]
+*.[xX][lL][sS][xX]
+
+E1-a_representation_quality/artifacts/runs/
+artifacts/
