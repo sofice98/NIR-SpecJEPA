@@ -1,7 +1,15 @@
-"""Matched MAE and LeJEPA models for one-dimensional spectra."""
+"""Matched MAE and LeJEPA models for one-dimensional spectra.
 
-from .shared.backbone import SpectralPatchTransformer, SpectralUNet
-from .mae.model import SpectralMAE
-from .lejepa.model import SpectralLeJEPA
+Classical baselines can be imported without installing PyTorch; neural symbols
+remain available when the optional dependency is installed.
+"""
 
-__all__ = ["SpectralPatchTransformer", "SpectralUNet", "SpectralMAE", "SpectralLeJEPA"]
+try:
+    from .shared.backbone import SpectralPatchTransformer, SpectralUNet
+    from .mae.model import SpectralMAE
+    from .lejepa.model import SpectralLeJEPA
+    __all__ = ["SpectralPatchTransformer", "SpectralUNet", "SpectralMAE", "SpectralLeJEPA"]
+except ModuleNotFoundError as exc:
+    if exc.name != "torch":
+        raise
+    __all__ = []

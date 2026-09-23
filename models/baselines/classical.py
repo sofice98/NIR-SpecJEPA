@@ -20,6 +20,7 @@ class BaselineResult:
     prediction: np.ndarray
     selected_params: dict[str, float | int | str]
     train_prediction: np.ndarray | None = None
+    model: object | None = None
 
 
 def normalized_mse(y_true: np.ndarray, y_pred: np.ndarray, scale: np.ndarray) -> float:
@@ -35,12 +36,15 @@ def choose_candidate(
     candidates = list(candidates)
     if not candidates:
         raise ValueError("At least one valid hyperparameter candidate is required")
-    scale = y.std(axis=0)
+    y_array = np.asarray(y)
+    if y_array.ndim == 1:
+        y_array = y_array[:, None]
+    scale = y_array.std(axis=0)
     scale[scale < 1e-12] = 1.0
     scored = []
     for candidate in candidates:
         fold_scores = [
-            normalized_mse(y[valid], fit_predict(candidate, train, valid), scale)
+            normalized_mse(y_array[valid], np.asarray(fit_predict(candidate, train, valid)).reshape(-1, y_array.shape[1]), scale)
             for train, valid in folds
         ]
         scored.append((float(np.mean(fold_scores)), candidate))
@@ -61,7 +65,7 @@ def raw_ridge(
 
     best = choose_candidate(candidates, folds, train_y, fit_predict)
     model = RidgeRegressor(best["alpha"]).fit(train_x, train_y)
-    return BaselineResult(model.predict(test_x), best, model.predict(train_x))
+    return BaselineResult(model.predict(test_x), best, model.predict(train_x), model)
 
 
 def pca_ridge(
@@ -87,7 +91,7 @@ def pca_ridge(
     best = choose_candidate(candidates, folds, train_y, fit_predict)
     pca = PCA(n_components=best["n_components"], random_state=seed).fit(train_x)
     model = RidgeRegressor(best["alpha"]).fit(pca.transform(train_x), train_y)
-    return BaselineResult(model.predict(pca.transform(test_x)), best, model.predict(pca.transform(train_x)))
+    return BaselineResult(model.predict(pca.transform(test_x)), best, model.predict(pca.transform(train_x)), (pca, model))
 
 
 def pls(
@@ -112,7 +116,7 @@ def pls(
     model = PLSRegression(
         n_components=best["n_components"], scale=True, max_iter=max_iter, tol=tolerance
     ).fit(train_x, train_y)
-    return BaselineResult(model.predict(test_x), best, model.predict(train_x))
+    return BaselineResult(model.predict(test_x), best, model.predict(train_x), model)
 
 
 def rbf_svr(
@@ -144,6 +148,7 @@ def rbf_svr(
         predict_targets(best, train_x, train_y, test_x),
         best,
         predict_targets(best, train_x, train_y, train_x),
+        None,
     )
 
 
@@ -170,8 +175,14 @@ def random_forest(
         )
 
     def fit_predict(candidate, train, valid):
-        return build(candidate).fit(train_x[train], train_y[train]).predict(train_x[valid])
+        target = np.asarray(train_y[train])
+        if target.ndim == 2 and target.shape[1] == 1:
+            target = target[:, 0]
+        return build(candidate).fit(train_x[train], target).predict(train_x[valid])
 
     best = choose_candidate(candidates, folds, train_y, fit_predict)
-    model = build(best).fit(train_x, train_y)
-    return BaselineResult(model.predict(test_x), best, model.predict(train_x))
+    target = np.asarray(train_y)
+    if target.ndim == 2 and target.shape[1] == 1:
+        target = target[:, 0]
+    model = build(best).fit(train_x, target)
+    return BaselineResult(model.predict(test_x), best, model.predict(train_x), model)

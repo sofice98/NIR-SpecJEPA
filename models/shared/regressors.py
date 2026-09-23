@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 import numpy as np
-import torch
-from torch import nn
+try:
+    import torch
+    from torch import nn
+except ModuleNotFoundError:  # classical baselines do not require PyTorch
+    torch = None
+    class _NN:
+        class Module:
+            pass
+    nn = _NN()
 
 
 class RidgeRegressor:
@@ -42,6 +49,8 @@ class EncoderMLPRegressor(nn.Module):
         hidden_dim: int = 64,
         dropout: float = 0.0,
     ) -> None:
+        if torch is None:
+            raise RuntimeError("PyTorch is required for EncoderMLPRegressor")
         super().__init__()
         if output_dim < 1 or hidden_dim < 1:
             raise ValueError("output_dim and hidden_dim must be positive")
