@@ -6,6 +6,7 @@ import numpy as np
 
 @dataclass(frozen=True)
 class Fold:
+    """记录一折的训练、测试索引及可选留出组。"""
     fold: int
     train_idx: np.ndarray
     test_idx: np.ndarray
@@ -35,6 +36,7 @@ def pooled_group_balanced_folds(groups: np.ndarray, n_splits: int = 5, seed: int
 
 
 def leave_one_group_out_folds(groups: np.ndarray):
+    """轮流留出一个完整来源组作为测试折。"""
     groups = np.asarray(groups).astype(str)
     unique = np.unique(groups)
     return [

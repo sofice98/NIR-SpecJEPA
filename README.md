@@ -17,7 +17,10 @@
 │   ├── mae/                     # MAE
 │   └── lejepa/                  # LeJEPA 与 SIGReg
 ├── configs/                     # datasets/、experiments/、components/
-├── scripts/                     # prepare_data.py、run_e1a.py
+├── scripts/                     # 训练、验证、绘图与实验入口
+│   ├── run_e1a.py               # 预处理基线 + 回归头
+│   ├── run_e1b.py               # LeJEPA + 在线探针
+│   └── run_e1c.py               # LeJEPA 预训练 + 冻结 Encoder Probe
 ├── artifacts/
 │   ├── canonical/<dataset>/     # 规范化数据和固定划分
 │   └── runs/<run-name>/         # 日志、权重、预测、指标和图
@@ -67,17 +70,14 @@ python scripts/prepare_data.py ^
 
 `prepare_data.py` 会生成公共波长网格、规范化光谱、目标值、样本清单以及 `pooled`/`logo` 划分文件。
 
-示例：
+## 实验
 
 ```shell
-python scripts/run_e1a.py ^
-  --preprocessing SNV ^
-  --encoder-type unet ^
-  --mask-mode block ^
-  --mask-block-length 4 ^
-  --methods pls rbf_svr ^
-  --epochs 200 ^
-  --batch-size 16
+python scripts/run_e1a.py --datasets swri --experiments raw snv --regressors pls rf
+python scripts/run_e1b.py --datasets swri --epochs 100 --batch-size 16
+
+python scripts/run_e1c.py --datasets swri 
+python scripts/run_e1d.py --datasets swri --ssl-epochs 100 --probe-epochs 100 --probe linear
 ```
 
 
@@ -86,16 +86,14 @@ python scripts/run_e1a.py ^
 每次运行创建独立目录：
 
 ```text
-artifacts/runs/{protocol}_{YYYYMMDD_HHMMSS}_seed{seed}_ep{epochs}/
+artifacts/runs/{e1a,e1b,e1c}_{YYYYMMDD_HHMMSS}/
 ├── run.log
-├── run_config.json
-├── fold*_mae_encoder.pt
-├── fold*_lejepa_encoder.pt
-├── fold*_*_history.csv
-├── fold*_*_loss.png
-├── loss_curves_aggregate.png
-├── predictions.csv
-├── fold_metrics.csv
-├── summary_metrics.csv
-└── costs.csv
+├── config.json
+└── <dataset>/
+    ├── metrics.csv
+    ├── metrics_aggregate.csv
+    ├── run_summary.csv
+    ├── loss_curve.csv          # E1B、E1C
+    ├── ssl_runs.csv            # E1B、E1C
+    └── representations/        # E1B、E1C 的逐折权重和表示
 ```

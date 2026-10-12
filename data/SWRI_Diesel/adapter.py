@@ -14,6 +14,7 @@ MissingTargetStrategy = Literal["drop_missing", "all_train_spectra"]
 
 
 def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
+    """读取 SWRI 柴油数据，并记录各目标的缺失标签数量。"""
     root = Path(root)
     prop = pd.read_csv(root / "diesel_prop.csv", encoding="utf-8-sig")
     spec = pd.read_csv(root / "diesel_spec.csv", encoding="utf-8-sig")
@@ -26,6 +27,7 @@ def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
     spectra = spec.iloc[:, 1:].apply(pd.to_numeric, errors="coerce").to_numpy(float)
     if not np.isfinite(spectra).all():
         raise ValueError("Spectra contain non-finite values")
+    # 此数据源的光谱列已是波长，排序后与强度列保持一致。
     wavelengths = pd.to_numeric(spec.columns[1:], errors="coerce").to_numpy(float)
     if not np.isfinite(wavelengths).all() or np.any(wavelengths <= 0):
         raise ValueError("Spectrum headers must be positive wavelengths")
@@ -36,6 +38,7 @@ def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
 
 
 def target_valid_mask(dataset: CanonicalDataset, target: str) -> np.ndarray:
+    """返回指定目标具有观测标签的样本掩码。"""
     if target not in dataset.targets.columns:
         raise KeyError(f"Unknown target {target!r}; choose from {dataset.targets.columns.tolist()}")
     return dataset.targets[target].notna().to_numpy()

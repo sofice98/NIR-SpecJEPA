@@ -12,6 +12,7 @@ TARGET_COLUMNS = {"density": "density", "sulfur": "sulfur", "residual_carbon": "
 
 
 def _wavelengths(columns: pd.Index) -> np.ndarray:
+    """将光谱列名中的波数转换为纳米波长。"""
     wn = pd.to_numeric(pd.Index(columns), errors="coerce").to_numpy(float)
     if not np.all(np.isfinite(wn)) or np.any(wn <= 0):
         raise ValueError("Spectrum headers must be positive wavenumbers")
@@ -19,6 +20,7 @@ def _wavelengths(columns: pd.Index) -> np.ndarray:
 
 
 def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
+    """读取原油数据集 1，并对齐样本、目标与升序波长轴。"""
     root = Path(root)
     prop = pd.read_csv(root / "crude_oil_1_prop.csv", encoding="utf-8-sig")
     spec = pd.read_csv(root / "crude_oil_1_spec.csv", encoding="utf-8-sig")
@@ -32,6 +34,7 @@ def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
     spectra = spec.iloc[:, 1:].apply(pd.to_numeric, errors="coerce").to_numpy(float)
     if not np.isfinite(spectra).all():
         raise ValueError("Spectra contain non-finite values")
+    # 原始列以波数表示；转换后重排光谱列以满足统一数据格式。
     wavelengths = _wavelengths(spec.columns[1:])
     order = np.argsort(wavelengths)
     dataset = CanonicalDataset("crude_oil_1", sample_id, wavelengths[order], spectra[:, order], targets.reset_index(drop=True), np.full(len(sample_id), "crude_oil_1"))

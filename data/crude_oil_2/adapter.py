@@ -12,6 +12,7 @@ TARGET_COLUMNS = {"density": "density", "sulfur": "sulfur", "residual_carbon": "
 
 
 def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
+    """读取原油数据集 2，并对齐样本、目标与升序波长轴。"""
     root = Path(root)
     prop = pd.read_csv(root / "crude_oil_2_prop.csv", encoding="utf-8-sig")
     spec = pd.read_csv(root / "crude_oil_2_spec.csv", encoding="utf-8-sig")
@@ -25,6 +26,7 @@ def load_dataset(root: str | Path = DATASET_DIR) -> CanonicalDataset:
     spectra = spec.iloc[:, 1:].apply(pd.to_numeric, errors="coerce").to_numpy(float)
     if not np.isfinite(spectra).all():
         raise ValueError("Spectra contain non-finite values")
+    # 将波数转换成波长，并同步重排光谱列。
     wn = pd.to_numeric(spec.columns[1:], errors="coerce").to_numpy(float)
     if not np.isfinite(wn).all() or np.any(wn <= 0):
         raise ValueError("Spectrum headers must be positive wavenumbers")

@@ -1,3 +1,5 @@
+"""读取第二套原油光谱并导出波数轴上的概览图。"""
+
 from pathlib import Path
 
 import matplotlib
@@ -29,6 +31,7 @@ wavenumbers = pd.to_numeric(df.columns)
 # 转置：行=波数，列=样本，方便绘图。
 spectra = df.T
 
+# 绘制所有样本光谱，并按红外光谱惯例让波数从左到右递减。
 plt.figure(figsize=(12, 5))
 plt.plot(wavenumbers, spectra.values, linewidth=0.8)
 plt.xlabel("Wavenumber (cm⁻¹)")

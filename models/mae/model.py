@@ -1,4 +1,4 @@
-"""Matched masked-autoencoder objective using the shared encoder."""
+"""Matched masked-autoencoder objective using point-zeroed inputs."""
 
 from __future__ import annotations
 
@@ -7,10 +7,14 @@ from torch import nn
 from torch.nn import functional as F
 
 from ..shared.backbone import SpectralPatchTransformer, SpectralUNet
+from ..shared.masking import add_mask_indicator, apply_point_mask
 
 
 class SpectralMAE(nn.Module):
+    """通过点级掩码重建完整光谱的自监督模型。"""
+
     def __init__(self, encoder: SpectralPatchTransformer | SpectralUNet, decoder_hidden_dim: int = 64) -> None:
+        """包装共享编码器，并在需要时建立补丁解码器。"""
         super().__init__()
         self.encoder = encoder
         # Use the encoder's reconstruction path whenever it provides one.
@@ -22,36 +26,36 @@ class SpectralMAE(nn.Module):
             nn.Linear(decoder_hidden_dim, encoder.patch_size),
         )
 
-    def forward(self, spectra: torch.Tensor, patch_mask: torch.Tensor):
-        masks = patch_mask.unsqueeze(0) if patch_mask.ndim == 2 else patch_mask
-        if masks.ndim != 3:
-            raise ValueError("patch_mask must have shape [batch, patches] or [views, batch, patches]")
-        if spectra.ndim == 3:
-            targets = [self.encoder.patchify(view) for view in spectra]
+    def reconstruct(self, spectra: torch.Tensor, patch_mask: torch.Tensor | None = None) -> torch.Tensor:
+        """Reconstruct patch values through either the backbone or MAE decoder."""
+        if callable(getattr(self.encoder, "reconstruct", None)):
+            return self.encoder.reconstruct(spectra, patch_mask)
+        encoded, _ = self.encoder(spectra, patch_mask)
+        return self.decoder(encoded)
+
+    def forward(self, spectra: torch.Tensor, point_mask: torch.Tensor):
+        """Mask points with zeros and reconstruct the complete clean curve."""
+        if spectra.ndim != 2:
+            raise ValueError("spectra must have shape [batch, points]")
+        if point_mask.ndim == 2 and point_mask.shape[1] == self.encoder.n_patches:
+            point_mask = point_mask.repeat_interleave(self.encoder.patch_size, dim=1)[:, : spectra.shape[1]]
+        if point_mask.shape != spectra.shape:
+            raise ValueError("spectra and point_mask must have shape [batch, points]")
+        if getattr(self.encoder, "input_channels", 1) == 2:
+            masked_spectra = add_mask_indicator(spectra, point_mask)
         else:
-            targets = [self.encoder.patchify(spectra)] * len(masks)
-        losses, embeddings = [], []
-        for view_index, mask in enumerate(masks):
-            view = spectra[view_index] if spectra.ndim == 3 else spectra
-            encoded, pooled = self.encoder(view, mask)
-            if callable(getattr(self.encoder, "reconstruct", None)):
-                # The mask is [batch, n_patches], so reconstruction must use
-                # the corresponding 2-D view [batch, points], not the stacked
-                # multi-view tensor [views, batch, points].
-                reconstructed = self.encoder.reconstruct(view, mask)
-            else:
-                reconstructed = self.decoder(encoded)
-            if reconstructed.shape != targets[view_index].shape:
-                raise ValueError(
-                    "MAE reconstruction shape mismatch: "
-                    f"got {tuple(reconstructed.shape)}, "
-                    f"expected {tuple(targets[view_index].shape)}"
-                )
-            losses.append(F.mse_loss(reconstructed[mask], targets[view_index][mask]))
-            embeddings.append(pooled)
-        loss = torch.stack(losses).mean()
+            masked_spectra = apply_point_mask(spectra, point_mask)
+        _, pooled = self.encoder(masked_spectra, None)
+        reconstructed = self.reconstruct(masked_spectra, None)
+        reconstructed_curve = reconstructed.reshape(reconstructed.shape[0], -1)[:, : spectra.shape[1]]
+        if reconstructed_curve.shape != spectra.shape:
+            raise ValueError(
+                "MAE reconstruction shape mismatch: "
+                f"got {tuple(reconstructed_curve.shape)}, expected {tuple(spectra.shape)}"
+            )
+        loss = F.mse_loss(reconstructed_curve, spectra)
         return {
             "loss": loss,
             "reconstruction_mse": loss,
-            "embedding": torch.stack(embeddings).mean(dim=0),
+            "embedding": pooled,
         }

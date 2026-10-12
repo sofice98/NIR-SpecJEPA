@@ -6,6 +6,8 @@ from typing import Sequence
 
 import numpy as np
 
+from models.shared.airpls import AirPLSConfig, airpls_correct_batch
+
 
 def resample_to_common_grid(datasets: Sequence, grid_nm: np.ndarray | None = None):
     """Resample all datasets to the coarsest wavelength grid on the shared interval.
@@ -39,11 +41,13 @@ class FoldSpectralStandardizer:
     """Per-channel center/scale fitted only on a training fold."""
 
     def __init__(self, eps: float = 1e-8):
+        """设置低方差通道的数值保护阈值。"""
         self.eps = eps
         self.mean_: np.ndarray | None = None
         self.scale_: np.ndarray | None = None
 
     def fit(self, spectra: np.ndarray) -> "FoldSpectralStandardizer":
+        """从训练折估计每个光谱通道的均值与标准差。"""
         values = np.asarray(spectra, dtype=float)
         if values.ndim != 2:
             raise ValueError("spectra must be 2D")
@@ -53,15 +57,18 @@ class FoldSpectralStandardizer:
         return self
 
     def transform(self, spectra: np.ndarray) -> np.ndarray:
+        """使用已拟合的训练折统计量变换光谱。"""
         if self.mean_ is None or self.scale_ is None:
             raise RuntimeError("Fit standardizer before transform")
         return (np.asarray(spectra, dtype=float) - self.mean_) / self.scale_
 
     def fit_transform(self, spectra: np.ndarray) -> np.ndarray:
+        """拟合并变换同一批训练光谱。"""
         return self.fit(spectra).transform(spectra)
 
 
 def snv(spectra: np.ndarray, eps: float = 1e-8) -> np.ndarray:
+    """逐条光谱执行标准正态变量变换。"""
     values = np.asarray(spectra, dtype=float)
     mean = values.mean(axis=1, keepdims=True)
     scale = values.std(axis=1, keepdims=True)
@@ -69,10 +76,12 @@ def snv(spectra: np.ndarray, eps: float = 1e-8) -> np.ndarray:
 
 
 def msc(spectra: np.ndarray, reference: np.ndarray | None = None, eps: float = 1e-8) -> np.ndarray:
+    """相对参考光谱逐样本校正加性与乘性散射。"""
     values = np.asarray(spectra, dtype=float)
     ref = values.mean(axis=0) if reference is None else np.asarray(reference, dtype=float)
     design = np.column_stack([np.ones(len(ref)), ref])
     corrected = np.empty_like(values)
+    # 每条光谱对参考曲线做线性拟合，再移除截距并按斜率缩放。
     for i, row in enumerate(values):
         coeff, *_ = np.linalg.lstsq(design, row, rcond=None)
         corrected[i] = (row - coeff[0]) / (coeff[1] if abs(coeff[1]) > eps else 1.0)
@@ -85,6 +94,7 @@ def preprocess_pair(
     method: str = "R",
     sg_window: int = 11,
     sg_polyorder: int = 2,
+    airpls_config: AirPLSConfig | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Apply one selectable spectral transform to a train/test fold.
 
@@ -94,12 +104,14 @@ def preprocess_pair(
     scaling should be applied afterwards when required by the experiment.
     """
     name = method.upper()
-    if name not in {"R", "FD", "SD", "SNV", "MSC", "SG"}:
+    if name not in {"R", "FD", "SD", "SNV", "MSC", "SG", "AIRPLS"}:
         raise ValueError(f"Unsupported preprocessing method: {method}")
     train = np.asarray(train_spectra, dtype=float)
     test = np.asarray(test_spectra, dtype=float)
     if name == "R":
         return train, test
+    if name == "AIRPLS":
+        return airpls_correct_batch(train, airpls_config), airpls_correct_batch(test, airpls_config)
     if name == "FD":
         deriv = 1
     elif name == "SD":

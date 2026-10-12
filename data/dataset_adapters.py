@@ -22,6 +22,7 @@ class CanonicalDataset:
     metadata: dict[str, object] = field(default_factory=dict)
 
     def validate(self) -> None:
+        """检查光谱、标签和分组的形状及波长轴约束。"""
         sample_count = len(self.sample_id)
         if self.spectra.ndim != 2:
             raise ValueError(f"{self.name}: spectra must be 2D")
@@ -61,6 +62,7 @@ def merge_datasets(
     from preprocessing.spectral import resample_to_common_grid
 
     wavelengths_nm, resampled = resample_to_common_grid(parts, grid_nm=grid_nm)
+    # 保留各来源的分组标记，并将重采样后的样本按原顺序拼接。
     merged = CanonicalDataset(
         name=name,
         sample_id=np.concatenate([dataset.sample_id for dataset in parts]),
