@@ -753,6 +753,9 @@ def run_dataset(
         fold_label = f"{dataset_name} | fold {fold.fold + 1}/{len(folds)}"
         train_x = np.asarray(dataset.spectra[fold.train_idx], dtype=np.float32)
         test_x = np.asarray(dataset.spectra[fold.test_idx], dtype=np.float32)
+        tqdm.write(
+            f"[{fold_label}] train samples={len(train_x)} | test samples={len(test_x)}"
+        )
         run_id = f"lejepa_fold{fold.fold}"
         asset = output_dir / "representations" / run_id
         context = fold_context(dataset, dataset_name, fold)
@@ -791,6 +794,11 @@ def run_dataset(
             probe_train_indices = np.flatnonzero(
                 np.isfinite(targets[fold.train_idx, c])
             )
+            observed_test_count = int(np.isfinite(targets[fold.test_idx, c]).sum())
+            tqdm.write(
+                f"[{fold_label}] {target} | train n={len(probe_train_indices)} | "
+                f"test n={observed_test_count}"
+            )
             if not len(probe_train_indices):
                 tqdm.write(
                     f"[{fold_label}] {target}: no observed training labels; skipping head"
@@ -799,10 +807,6 @@ def run_dataset(
             probe_train_targets = targets[
                 fold.train_idx[probe_train_indices], c : c + 1
             ]
-            tqdm.write(
-                f"[{fold_label}] {target}: SSL samples={len(train_x)}, "
-                f"probe samples={len(probe_train_indices)}"
-            )
             probe_result = fit_probe(
                 ssl_result.train_embedding[probe_train_indices],
                 probe_train_targets,
@@ -850,8 +854,7 @@ def run_dataset(
                 f"train n={train_metrics['n']} RMSE={train_metrics['rmse']:.5g} "
                 f"R2={train_metrics['r2']:.5g} RPD={train_metrics['rpd']:.5g} | "
                 f"test n={test_metrics['n']} RMSE={test_metrics['rmse']:.5g} "
-                f"R2={test_metrics['r2']:.5g} RPD={test_metrics['rpd']:.5g} | "
-                f"R2 gap (train-test)={r2_gap:.5g}"
+                f"R2={test_metrics['r2']:.5g} RPD={test_metrics['rpd']:.5g}"
             )
             if train_metrics["n"] or test_metrics["n"]:
                 rows.append(
@@ -958,7 +961,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=6,
         help="Number of spectral points per non-overlapping patch",
     )
-    parser.add_argument("--sigreg-weight", type=float, default=0.10)
+    parser.add_argument("--sigreg-weight", type=float, default=0.02)
     parser.add_argument(
         "--ssl-grad-clip",
         type=float,

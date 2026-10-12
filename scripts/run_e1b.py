@@ -1,4 +1,4 @@
-"""Run E1B LeJEPA with a detached online regression probe.
+"""Run E1B LeJEPA with a detached online regression probe per target.
 
 The encoder learns from the self-supervised LeJEPA objective while a small
 probe reads detached embeddings. The probe supplies a useful supervised
@@ -92,7 +92,10 @@ def plot_loss_curves(history_rows: list[dict], out_dir: Path, logger: logging.Lo
     out_dir.mkdir(parents=True, exist_ok=True)
     generated: list[Path] = []
     loss_columns = ["loss", "regression_loss", "invariance_mse", "sigreg"]
-    for experiment, subset in history.groupby("experiment", sort=True):
+    group_columns = ["experiment", "target"] if "target" in history.columns else "experiment"
+    for group_key, subset in history.groupby(group_columns, sort=True):
+        experiment = group_key[0] if isinstance(group_key, tuple) else group_key
+        target = group_key[1] if isinstance(group_key, tuple) else None
         fig, axes = plt.subplots(
             len(loss_columns), 1, figsize=(12, 5 * len(loss_columns)), squeeze=False, sharex=True
         )
@@ -114,13 +117,14 @@ def plot_loss_curves(history_rows: list[dict], out_dir: Path, logger: logging.Lo
                 "loss": "total loss", "regression_loss": "regression loss",
                 "invariance_mse": "invariance loss", "sigreg": "SIGReg loss",
             }[loss_column]
-            ax.set_title(f"{experiment} joint training: {title}")
+            ax.set_title(f"{experiment} {target or ''} joint training: {title}")
             ax.set_ylabel(title)
             ax.grid(True, alpha=0.25)
             ax.legend(fontsize=7, ncol=2, loc="best")
         axes[-1, 0].set_xlabel("Epoch")
         fig.tight_layout()
-        path = out_dir / f"loss_curves_{experiment.lower()}_joint_train.png"
+        target_suffix = f"_target{list(history.target.unique()).index(target)}" if target is not None else ""
+        path = out_dir / f"loss_curves_{experiment.lower()}{target_suffix}_joint_train.png"
         fig.savefig(path, dpi=200)
         plt.close(fig)
         generated.append(path)
@@ -211,7 +215,7 @@ def joint_lejepa_representation(
     sigreg_weight: float = 0.02,
     logger: logging.Logger | None = None,
 ) -> tuple[object, dict[str, torch.Tensor], np.ndarray, np.ndarray, list[dict], int, int]:
-    """Train LeJEPA and its detached online probe for one outer fold.
+    """Train LeJEPA and its detached online probe for one target and fold.
 
     A patch-masked view and a clean view are optimized with the LeJEPA invariance/SIGReg losses.
     The probe sees ``view_embeddings.detach()`` from both views, so its
@@ -223,6 +227,8 @@ def joint_lejepa_representation(
     from torch.utils.data import DataLoader, TensorDataset
     from torch import nn
 
+    if train_y.ndim != 2 or train_y.shape[1] != 1 or not np.isfinite(train_y).all():
+        raise ValueError("train_y must contain one target with no missing labels")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     torch.manual_seed(seed)
     if backbone != "patch_transformer":
@@ -231,12 +237,9 @@ def joint_lejepa_representation(
     model = SpectralLeJEPA(encoder, sigreg_weight=sigreg_weight, mask_mode="patch").to(device)
     if encoder.n_patches < 2:
         raise ValueError("Patch masking requires at least two patches; reduce --patch-size")
-    # 用训练折的观测标签归一化目标；缺失值只参与填充，不计入探针损失。
-    target_mean, target_scale, observed = _target_statistics(train_y)
-    filled_y = np.where(np.isfinite(train_y), train_y, target_mean)
-    mask_y = observed.astype(np.float32)
-    normalized_y = (filled_y - target_mean) / target_scale
-    head = nn.Sequential(nn.LayerNorm(encoder.embedding_dim), nn.Linear(encoder.embedding_dim, train_y.shape[1])).to(device)
+    target_mean, target_scale, _ = _target_statistics(train_y)
+    normalized_y = (train_y - target_mean) / target_scale
+    head = nn.Sequential(nn.LayerNorm(encoder.embedding_dim), nn.Linear(encoder.embedding_dim, 1)).to(device)
     optimizer = torch.optim.AdamW([
         {"params": model.parameters(), "lr": learning_rate, "weight_decay": 5e-2},
         {"params": head.parameters(), "lr": head_learning_rate, "weight_decay": 1e-7},
@@ -246,7 +249,6 @@ def joint_lejepa_representation(
         TensorDataset(
             torch.as_tensor(train_x, dtype=torch.float32),
             torch.as_tensor(normalized_y, dtype=torch.float32),
-            torch.as_tensor(mask_y, dtype=torch.float32),
         ), batch_size=effective_batch_size, shuffle=True, drop_last=False,
     )
     scheduler = build_step_scheduler(
@@ -262,8 +264,8 @@ def joint_lejepa_representation(
         epoch_learning_rate = float(optimizer.param_groups[0]["lr"])
         probe_learning_rate = float(optimizer.param_groups[1]["lr"])
         losses: dict[str, list[float]] = {"loss": [], "lejepa_loss": [], "regression_loss": [], "invariance_mse": [], "sigreg": []}
-        for batch_x, batch_y, batch_mask in loader:
-            batch_x, batch_y, batch_mask = batch_x.to(device), batch_y.to(device), batch_mask.to(device)
+        for batch_x, batch_y in loader:
+            batch_x, batch_y = batch_x.to(device), batch_y.to(device)
             patch_mask = random_patch_mask(
                 len(batch_x), encoder.n_patches, mask_ratio, device=device,
             )
@@ -273,10 +275,7 @@ def joint_lejepa_representation(
             output = model(batch_x, patch_mask)
             # Both views train the probe, but labels never train the encoder.
             prediction = head(output["view_embeddings"].detach())
-            residual = (prediction - batch_y.unsqueeze(0)).square() * batch_mask.unsqueeze(0)
-            # Missing targets contribute zero through batch_mask; the denominator
-            # counts observed target/view pairs rather than padded values.
-            regression_loss = residual.sum() / (batch_mask.sum() * prediction.shape[0]).clamp_min(1.0)
+            regression_loss = (prediction - batch_y.unsqueeze(0)).square().mean()
             loss = output["loss"] + regression_loss
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
@@ -322,7 +321,7 @@ def joint_lejepa_representation(
 
 def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Namespace,
                 out_dir: Path, logger: logging.Logger) -> None:
-    """逐折训练 LeJEPA 与在线探针，并保存表示、预测指标和训练记录。"""
+    """逐折、逐目标训练 LeJEPA 与在线探针，并保存结果。"""
     from models.lejepa.probe import predict_saved_lejepa_probe
 
     dataset.validate()
@@ -335,54 +334,85 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
     if len(dataset.sample_id) < 2:
         raise ValueError("at least 2 samples are required for cross-validation")
     folds = pooled_group_balanced_folds(dataset.groups, n_splits=min(args.folds, len(dataset.sample_id)), seed=args.seed)
+    # Match E1C's reproducible first-fold patch-mask illustration.
+    from scripts.run_e1c import plot_first_fold_masks
+
+    plot_first_fold_masks(
+        dataset, folds[0].train_idx, args.patch_size, args.mask_ratio, args.seed, out_dir
+    )
     targets = dataset.targets.to_numpy(float)
     rows: list[dict] = []
     histories: list[dict] = []
     summaries: list[dict] = []
     assets: list[dict] = []
     for fold in folds:
-        started = time.perf_counter()
         train_idx, test_idx = fold.train_idx, fold.test_idx
-        train_x = np.asarray(dataset.spectra[train_idx], dtype=np.float32)
+        fold_label = f"{dataset_name} | fold {fold.fold + 1}/{len(folds)}"
+        logger.info("[%s] train samples=%d | test samples=%d", fold_label, len(train_idx), len(test_idx))
         test_x = np.asarray(dataset.spectra[test_idx], dtype=np.float32)
-        encoder, state, train_embedding, test_embedding, history, model_params, probe_params = joint_lejepa_representation(
-            args.backbone, train_x, targets[train_idx], test_x, args.epochs, args.batch_size,
-            args.mask_ratio, args.patch_size, DEFAULT_EMBEDDING_DIM,
-            args.seed + fold.fold, args.learning_rate, args.probe_learning_rate,
-            args.scheduler, args.scheduler_eta_min, args.sigreg_weight, logger,
-        )
-        # Evaluate the persisted probe state, matching the representation that is
-        # written to disk for later reproducibility checks.
-        prediction = predict_saved_lejepa_probe(test_embedding, state)
-        fit_seconds = time.perf_counter() - started
-        run_id = f"lejepa_fold{fold.fold}"
-        asset_dir = out_dir / "representations" / run_id
-        fold_history = [dict(row, experiment="lejepa", fold=fold.fold) for row in history]
-        # 每折单独保存完整模型、编码器和表示，供后续分析复用。
-        save_representation_assets(
-            asset_dir, state, detached_state_dict(encoder),
-            {"train_embedding": train_embedding, "test_embedding": test_embedding}, fold_history,
-            {"dataset": dataset_name, "fold": fold.fold, "kind": "lejepa",
-             "training_mode": "lejepa_online_probe", "probe_detached": True,
-             "model_params": model_params, "probe_params": probe_params},
-        )
-        histories.extend(dict(row, dataset=dataset_name, representation_run_id=run_id) for row in fold_history)
-        assets.append({"representation_run_id": run_id, "dataset": dataset_name,
-                       "fold": fold.fold, "asset_dir": str(asset_dir)})
-        selected_params = json.dumps({"source": "one_stage_lejepa_probe", "detached": True})
-        common = {"dataset": dataset_name, "experiment": "lejepa", "label": "LeJEPA",
-                  "regressor": "probe", "fold": fold.fold, "representation_run_id": run_id,
-                  "train_time_sec": fit_seconds, "model_params": model_params,
-                  "probe_params": probe_params, "model_total_params": model_params + probe_params,
-                  "selected_params": selected_params}
-        # 对缺失标签逐目标筛选后计算测试指标。
         for col, target in enumerate(dataset.targets.columns):
-            valid = np.isfinite(targets[test_idx, col]) & np.isfinite(prediction[:, col])
-            if np.any(valid):
-                rmse, r2, rpd = metrics(targets[test_idx, col][valid], prediction[valid, col])
-                rows.append({**common, "target": target, "rmse": rmse, "r2": r2,
-                             "rpd": rpd, "n_test": int(valid.sum())})
-        summaries.append(common)
+            observed_train = np.isfinite(targets[train_idx, col])
+            observed_test = np.isfinite(targets[test_idx, col])
+            target_train_idx = train_idx[observed_train]
+            logger.info(
+                "[%s] %s | train n=%d | test n=%d",
+                fold_label, target, len(target_train_idx), int(observed_test.sum()),
+            )
+            if not len(target_train_idx):
+                logger.warning("[%s] %s: no observed training labels; skipping target", fold_label, target)
+                continue
+            started = time.perf_counter()
+            train_x = np.asarray(dataset.spectra[target_train_idx], dtype=np.float32)
+            train_y = targets[target_train_idx, col : col + 1]
+            encoder, state, train_embedding, test_embedding, history, model_params, probe_params = joint_lejepa_representation(
+                args.backbone, train_x, train_y, test_x, args.epochs, args.batch_size,
+                args.mask_ratio, args.patch_size, DEFAULT_EMBEDDING_DIM,
+                args.seed + fold.fold + col, args.learning_rate, args.probe_learning_rate,
+                args.scheduler, args.scheduler_eta_min, args.sigreg_weight, logger,
+            )
+            train_prediction = predict_saved_lejepa_probe(train_embedding, state)[:, 0]
+            prediction = predict_saved_lejepa_probe(test_embedding, state)[:, 0]
+            fit_seconds = time.perf_counter() - started
+            run_id = f"lejepa_fold{fold.fold}_target{col}"
+            asset_dir = out_dir / "representations" / run_id
+            fold_history = [dict(row, experiment="lejepa", fold=fold.fold, target=target) for row in history]
+            save_representation_assets(
+                asset_dir, state, detached_state_dict(encoder),
+                {"train_embedding": train_embedding, "test_embedding": test_embedding,
+                 "train_indices": target_train_idx, "test_indices": test_idx}, fold_history,
+                {"dataset": dataset_name, "fold": fold.fold, "target": str(target),
+                 "target_index": col, "kind": "lejepa", "training_mode": "lejepa_online_probe",
+                 "probe_detached": True, "train_samples": len(target_train_idx),
+                 "test_samples": len(test_idx), "model_params": model_params,
+                 "probe_params": probe_params},
+            )
+            histories.extend(dict(row, dataset=dataset_name, representation_run_id=run_id) for row in fold_history)
+            assets.append({"representation_run_id": run_id, "dataset": dataset_name,
+                           "fold": fold.fold, "target": target, "asset_dir": str(asset_dir)})
+            common = {"dataset": dataset_name, "experiment": "lejepa", "label": "LeJEPA",
+                      "regressor": "probe", "fold": fold.fold, "target": target,
+                      "representation_run_id": run_id, "train_time_sec": fit_seconds,
+                      "model_params": model_params, "probe_params": probe_params,
+                      "model_total_params": model_params + probe_params,
+                      "selected_params": json.dumps({"source": "one_stage_lejepa_probe", "detached": True})}
+            summaries.append(common)
+            train_valid = np.isfinite(train_prediction)
+            test_valid = observed_test & np.isfinite(prediction)
+            train_rmse, train_r2, train_rpd = metrics(train_y[train_valid, 0], train_prediction[train_valid])
+            test_rmse, test_r2, test_rpd = (
+                metrics(targets[test_idx, col][test_valid], prediction[test_valid])
+                if np.any(test_valid) else (float("nan"),) * 3
+            )
+            rows.append({**common, "train_rmse": train_rmse, "train_r2": train_r2,
+                         "train_rpd": train_rpd, "n_train": int(train_valid.sum()),
+                         "rmse": test_rmse, "r2": test_r2, "rpd": test_rpd,
+                         "n_test": int(test_valid.sum())})
+            logger.info(
+                "[%s] %s | train n=%d RMSE=%.6g R2=%.6g RPD=%.6g | "
+                "test n=%d RMSE=%.6g R2=%.6g RPD=%.6g",
+                fold_label, target, int(train_valid.sum()), train_rmse, train_r2, train_rpd,
+                int(test_valid.sum()), test_rmse, test_r2, test_rpd,
+            )
     # 输出逐折结果、跨折均值、训练曲线和表示文件索引。
     # These four files provide complementary views of a run: fold metrics,
     # epoch losses, per-fold assets, and the aggregate run metadata.
@@ -393,7 +423,8 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
     if rows:
         aggregate = pd.DataFrame(rows).groupby(
             ["dataset", "experiment", "label", "regressor", "target"], as_index=False
-        )[["rmse", "r2", "rpd", "train_time_sec", "model_total_params"]].mean()
+        )[["train_rmse", "train_r2", "train_rpd", "rmse", "r2", "rpd",
+           "train_time_sec", "model_total_params"]].mean()
         aggregate.to_csv(out_dir / "metrics_aggregate.csv", index=False, encoding="utf-8-sig")
     plot_loss_curves(histories, out_dir, logger)
     logger.info("Wrote %d metric rows, %d history rows and %d summaries to %s",

@@ -110,7 +110,7 @@ def test_ssl_gradient_clipping_is_optional_and_positive(monkeypatch):
     assert calls == [0.5]
 
 
-def test_e1c_fold_uses_all_spectra_and_per_target_probes(tmp_path, monkeypatch):
+def test_e1c_fold_uses_all_spectra_and_per_target_probes(tmp_path, monkeypatch, capsys):
     args = run_e1c.build_parser().parse_args(
         [
             "--folds",
@@ -182,6 +182,16 @@ def test_e1c_fold_uses_all_spectra_and_per_target_probes(tmp_path, monkeypatch):
     monkeypatch.setattr(run_e1c, "pretrain", capture_pretrain)
     monkeypatch.setattr(run_e1c, "fit_probe", capture_probe)
     run_e1c.run_dataset(dataset, "SWRI_Diesel_drop_missing", args, tmp_path)
+    console = capsys.readouterr().out
+    from splits.cross_validation import pooled_group_balanced_folds
+
+    for fold in pooled_group_balanced_folds(dataset.groups, n_splits=2, seed=args.seed):
+        label = f"SWRI_Diesel_drop_missing | fold {fold.fold + 1}/2"
+        assert f"[{label}] train samples=6 | test samples=6" in console
+        for column, target in enumerate(("a", "b")):
+            train_count = np.isfinite(targets[fold.train_idx, column]).sum()
+            test_count = np.isfinite(targets[fold.test_idx, column]).sum()
+            assert f"[{label}] {target} | train n={train_count} | test n={test_count}" in console
     summary = pd.read_csv(tmp_path / "run_summary.csv")
     assert len(frozen_encoders) == 2
     assert len(summary) == 4

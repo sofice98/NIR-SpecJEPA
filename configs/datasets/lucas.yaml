@@ -1,0 +1,19 @@
+name: LUCAS_SOIL
+adapter: data.lucas.adapter:load_dataset
+root: data/lucas
+spectral_axis: wavelength_nm
+spectral_columns: "spc.<nm>"
+groups: country
+targets:
+  - coarse
+  - clay
+  - silt
+  - sand
+  - pH.in.CaCl2
+  - pH.in.H2O
+  - OC
+  - CaCO3
+  - N
+  - P
+  - K
+  - CEC
