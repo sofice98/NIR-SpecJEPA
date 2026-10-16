@@ -24,5 +24,6 @@ dist/
 *.[cC][sS][vV]
 *.[xX][lL][sS][xX]
 
-E1-a_representation_quality/artifacts/runs/
+
 artifacts/
+docs/

@@ -16,9 +16,10 @@ from models.lejepa.model import SpectralLeJEPA
 from models.lejepa.sigreg import SIGReg
 from models.shared.scheduling import build_step_scheduler
 from models.shared.experiment import build_ssl_encoder
-from scripts import run_e1b, run_e1f
+from scripts import run_e1b
+from runs.e1f import run as run_e1f
 from scripts.run_e1b import joint_lejepa_representation, plot_loss_curves
-from scripts.run_e1f import ssl_representation, supervised_embeddings
+from runs.e1f.run import ssl_representation, supervised_embeddings
 
 
 def test_sigreg_matches_reference_per_view_statistic():
