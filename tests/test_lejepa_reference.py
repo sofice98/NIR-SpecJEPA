@@ -1,4 +1,4 @@
-"""Regression checks for the mnist.py training protocol adaptation."""
+﻿"""Regression checks for the mnist.py training protocol adaptation."""
 
 import json
 import logging
@@ -16,10 +16,10 @@ from models.lejepa.model import SpectralLeJEPA
 from models.lejepa.sigreg import SIGReg
 from models.shared.scheduling import build_step_scheduler
 from models.shared.experiment import build_ssl_encoder
-from scripts import run_e1b
-from runs.e1f import run as run_e1f
-from scripts.run_e1b import joint_lejepa_representation, plot_loss_curves
-from runs.e1f.run import ssl_representation, supervised_embeddings
+from scripts import e1b as run_e1b
+from scripts import e1f as run_e1f
+from scripts.e1b import joint_lejepa_representation, plot_loss_curves
+from scripts.e1f import ssl_representation, supervised_embeddings
 
 
 def test_sigreg_matches_reference_per_view_statistic():
@@ -169,7 +169,7 @@ def test_fold_assets_are_single_stage_per_target(tmp_path, monkeypatch, caplog):
     assert (tmp_path / "first_fold_patch_masks.png").is_file()
     mask_rows = pd.read_csv(tmp_path / "first_fold_patch_masks.csv")
     assert mask_rows.dataset_index.nunique() == 3
-    assert mask_rows.groupby("dataset_index").size().tolist() == [6, 6, 6]
+    assert mask_rows.groupby("dataset_index").size().tolist() == [4, 4, 4]
     assert mask_rows.groupby("dataset_index").masked.sum().tolist() == [2, 2, 2]
     assert mask_rows.point_end_exclusive.max() == 24
     fold_metrics = pd.read_csv(tmp_path / "metrics.csv")

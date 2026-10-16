@@ -18,9 +18,11 @@
 │   └── lejepa/                  # LeJEPA 与 SIGReg
 ├── configs/                     # datasets/、experiments/、components/
 ├── scripts/                     # 训练、验证、绘图与实验入口
-│   ├── run_e1a.py               # 预处理基线 + 回归头
-│   ├── run_e1b.py               # LeJEPA + 在线探针
-│   └── run_e1c.py               # LeJEPA 预训练 + 冻结 Encoder Probe
+│   ├── e1a.py                   # 预处理基线 + 回归头
+│   ├── e1b.py                   # LeJEPA + 在线探针
+│   ├── e1c.py                   # LeJEPA 预训练 + 冻结 Encoder Probe
+│   ├── e1d.py                   # Laya 自监督、回归及扫描分析
+│   └── e1f.py                   # MAE 实验
 ├── artifacts/
 │   ├── canonical/<dataset>/     # 规范化数据和固定划分
 │   └── runs/<run-name>/         # 日志、权重、预测、指标和图
@@ -79,7 +81,7 @@ python scripts/prepare_data.py ^
 比较原始光谱（`raw`）、一阶导（`fd`）、二阶导（`sd`）、SNV（`snv`）、MSC（`msc`）和 airPLS（`airpls`）与 PLS、随机森林（`rf`）、MLP 回归器的组合。预处理及后续标准化在每个训练折内拟合。
 
 ```shell
-python scripts/run_e1a.py --datasets swri --experiments raw fd sd snv msc airpls --regressors pls rf mlp
+python scripts/e1a.py --datasets swri --experiments raw fd sd snv msc airpls --regressors pls rf mlp
 ```
 
 ### E1B：LeJEPA 与在线 Probe
@@ -87,7 +89,7 @@ python scripts/run_e1a.py --datasets swri --experiments raw fd sd snv msc airpls
 直接使用原始光谱，以单通道 Patch Transformer 和随机完整 patch token 掩码训练 LeJEPA。每个目标独立训练一套 LeJEPA 与单目标在线 Probe，训练前排除该目标缺失标签的样本。Probe 在同一训练阶段读取两种视图中与编码器梯度断开的表示，标签损失不更新编码器。
 
 ```shell
-python scripts/run_e1b.py --datasets swri --epochs 100 --batch-size 16 --patch-size 6 --mask-ratio 0.4
+python scripts/e1b.py --datasets swri --epochs 100 --batch-size 16 --patch-size 6 --mask-ratio 0.4
 ```
 
 ### E1C：LeJEPA 预训练与冻结 Probe
@@ -95,18 +97,18 @@ python scripts/run_e1b.py --datasets swri --epochs 100 --batch-size 16 --patch-s
 同样使用原始光谱、单通道 Patch Transformer 和完整 patch token 掩码。先完成 LeJEPA 自监督训练，再冻结编码器，针对每个目标分别训练 Probe；`--probe` 可选 `linear`、`ridge` 或 `mlp`。支持用 `--ssl-checkpoint` 复用已训练的自监督权重。
 
 ```shell
-python scripts/run_e1c.py --datasets swri --ssl-epochs 100 --probe-epochs 100 --probe linear --patch-size 6 --mask-ratio 0.4
+python scripts/e1c.py --datasets swri --ssl-epochs 100 --probe-epochs 100 --probe linear --patch-size 6 --mask-ratio 0.4
 ```
 
 ### E1D：固定基线单变量扫描
 
-E1D 主入口是 `scripts/run_e1d.py`。批量实验驱动位于 `runs/e1d/sweep.py`，固定基线为 mask ratio=0.4、SIGReg weight=0.02、SSL epochs=100、batch size=32、PLS 回归头、patch size=6、encoder dim=96。扫描依次只改变一个因素：掩码比例（0.2、0.4、0.6、0.8）、SIGReg weight（0.01、0.02、0.05、0.10、0.20、0.50、0.75）、SSL epoch（100、200）、batch size（16、32、64、128）、回归头（PLS、随机森林、MLP）、patch size（4、6、8、10、16）或 encoder dim（48、96、128、196）。基准值只运行一次，共 23 个配置。每个配置独立写入 `artifacts/runs/e1d_ota/<config>/`，根目录生成 `metrics.csv` 与 `metrics_aggregate.csv`。
+E1D 主入口是 `scripts/e1d.py`，批量实验使用 `scripts/e1d.py sweep`。固定基线为 mask ratio=0.4、SIGReg weight=0.02、SSL epochs=100、batch size=32、PLS 回归头、patch size=6、encoder dim=96。扫描依次只改变一个因素：掩码比例（0.2、0.4、0.6、0.8）、SIGReg weight（0.01、0.02、0.05、0.10、0.20、0.50、0.75）、SSL epoch（100、200）、batch size（16、32、64、128）、回归头（PLS、随机森林、MLP）、patch size（4、6、8、10、16）或 encoder dim（48、96、128、196）。基准值只运行一次，共 23 个配置。每个配置独立写入 `artifacts/runs/e1d_ota/<config>/`，根目录生成 `metrics.csv` 与 `metrics_aggregate.csv`。
 
 ```shell
-python runs/e1d/sweep.py --folds 5 --probe-epochs 100
+python scripts/e1d.py sweep --folds 5 --probe-epochs 100
 ```
 
-完整扫描结束后运行 `python runs/e1d/analyze_sweep.py --input-dir artifacts/runs/e1d_ota`，生成按目标及因素比较的图表和中文实验报告。本次 2026-10-16 完成的 SWRI 扫描报告位于 `docs/e1d_ota_20261015/2026-10-16--e1d-swri--r00--one-factor-ablation-report.md`，原始逐折结果位于 `artifacts/runs/e1d_ota_20261015/`。
+完整扫描结束后运行 `python scripts/e1d.py analyze-sweep --input-dir artifacts/runs/e1d_ota`，生成按目标及因素比较的图表和中文实验报告。本次 2026-10-16 完成的 SWRI 扫描报告位于 `docs/e1d_ota_20261015/2026-10-16--e1d-swri--r00--one-factor-ablation-report.md`，原始逐折结果位于 `artifacts/runs/e1d_ota_20261015/`。
 
 历史的多因素筛选脚本和绘图脚本保存在 `docs/e1d_swri_sweep_20261015/`，不作为当前 E1D 单变量协议的一部分。
 
@@ -131,3 +133,5 @@ artifacts/runs/{e1a,e1b,e1c}_{YYYYMMDD_HHMMSS}/
     ├── ssl_runs.csv            # E1B、E1C
     └── representations/        # E1B、E1C 的逐折权重和表示
 ```
+
+E1A ???????????E1B?E1D ???????? `representations/` ???????????? `figures/fold_mean/`?E1F ? MAE ??????????PLS?????? epoch ?? loss?????????

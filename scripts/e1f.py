@@ -1,4 +1,4 @@
-"""Run E1C masked autoencoder experiments.
+﻿"""Run E1C masked autoencoder experiments.
 
 E1C pretrains a spectral MAE inside each outer fold. Downstream evaluation can
 use reconstructed spectra (``mae_preprocess``) or encoder features
@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import sys
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path: sys.path.insert(0, str(ROOT))
 import numpy as np
 import pandas as pd
@@ -150,6 +150,32 @@ def plot_loss_curves(history_rows: list[dict], out_dir: Path, logger: logging.Lo
     logger.info("Generated loss plots: %s", ", ".join(str(item.name) for item in generated))
     return generated
 
+
+def plot_stage_losses(history_rows: list[dict], output_dir: Path, *, mean: bool = False) -> None:
+    """Save MAE reconstruction and supervised regression training curves."""
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(history_rows)
+    for stage, filename, title in (
+        ("ssl_pretrain", "ssl_loss.png", "MAE reconstruction loss"),
+        ("supervised_finetune", "regression_loss.png", "Regression training loss"),
+    ):
+        subset = frame.loc[frame.stage == stage].copy()
+        if mean and not subset.empty:
+            subset = subset.groupby("epoch", as_index=False)["loss"].mean()
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        if not subset.empty:
+            ax.plot(subset.epoch, subset.loss)
+        else:
+            ax.text(0.5, 0.5, "No epoch-wise loss recorded", ha="center", va="center", transform=ax.transAxes)
+        ax.set(xlabel="Epoch", ylabel="Loss", title=title)
+        ax.grid(alpha=0.2)
+        fig.tight_layout()
+        fig.savefig(output_dir / filename, dpi=180)
+        plt.close(fig)
 
 def save_mask_example(
     spectra: torch.Tensor,
@@ -602,6 +628,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
             {"dataset": dataset_name, "fold": fold.fold, "kind": "mae",
              "model_params": pretrained_params, "finetune_head_params": finetune_head_params},
         )
+        plot_stage_losses(history, asset_dir)
         histories.extend(dict(row, dataset=dataset_name, representation_run_id=run_id) for row in history)
         assets.append({"representation_run_id": run_id, "dataset": dataset_name,
                        "fold": fold.fold, "asset_dir": str(asset_dir)})
@@ -647,7 +674,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
             ["dataset", "experiment", "label", "regressor", "target"], as_index=False
         )[["rmse", "r2", "rpd", "train_time_sec", "model_total_params"]].mean()
         aggregate.to_csv(out_dir / "metrics_aggregate.csv", index=False, encoding="utf-8-sig")
-    plot_loss_curves(histories, out_dir, logger)
+    plot_stage_losses(histories, out_dir / "figures" / "fold_mean", mean=True)
     logger.info("Wrote %d metric rows, %d history rows and %d summaries to %s",
                 len(rows), len(histories), len(summaries), out_dir)
 
@@ -655,7 +682,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
 def parse_args() -> argparse.Namespace:
     """解析 MAE、微调、回归器和数据集参数。"""
     parser = argparse.ArgumentParser(description="Run E1C MAE experiments")
-    parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts" / "runs" / "e1c")
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "artifacts" / "runs" / "e1f")
     parser.add_argument("--swri-root", type=Path, default=ROOT / "data" / "SWRI_Diesel")
     parser.add_argument("--oil1-root", type=Path, default=ROOT / "data" / "crude_oil_1")
     parser.add_argument("--oil2-root", type=Path, default=ROOT / "data" / "crude_oil_2")
@@ -701,7 +728,7 @@ def main() -> None:
     seed_everything(args.seed)
     base_output_dir = args.output_dir if args.output_dir.is_absolute() else ROOT / args.output_dir
     args.output_dir = timestamped_run_dir(base_output_dir)
-    logger = configure_logging(args.output_dir, args.log_level, "e1c")
+    logger = configure_logging(args.output_dir, args.log_level, "e1f")
     run_started = time.perf_counter()
     logger.info("%s started | experiments=%s regressors=%s folds=%d datasets=%s seed=%d",
                 "E1C", ",".join(args.experiments), ",".join(args.regressors),
@@ -722,7 +749,7 @@ def main() -> None:
         lucas = load_lucas(args.lucas_root)
         logger.info("Loaded LUCAS_SOIL: samples=%d, wavelengths=%d", len(lucas.sample_id), lucas.spectra.shape[1])
     config = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
-    config["experiment_id"] = "e1c"
+    config["experiment_id"] = "e1f"
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "config.json").write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding="utf-8")
     if swri is not None:
@@ -745,3 +772,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+

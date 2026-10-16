@@ -1,4 +1,4 @@
-"""E1C: patch-masked Transformer LeJEPA followed by a frozen encoder probe."""
+﻿"""E1C: patch-masked Transformer LeJEPA followed by a frozen encoder probe."""
 
 from __future__ import annotations
 
@@ -571,56 +571,42 @@ def save_probe_assets(
     )
 
 
-def plot_fold_losses(history_rows: list[dict], output_dir: Path) -> None:
-    """Save three LeJEPA components and the per-target Probe loss separately."""
+def plot_fold_losses(history_rows: list[dict], output_dir: Path, weight: float, *, mean: bool = False) -> None:
+    """Save weighted SSL and regression training curves for one fold or fold means."""
     import matplotlib
-
     matplotlib.use("Agg", force=True)
     import matplotlib.pyplot as plt
 
+    output_dir.mkdir(parents=True, exist_ok=True)
     history = pd.DataFrame(history_rows)
-    ssl = history[history["stage"] == "ssl_pretrain"].sort_values("epoch")
-    for column, title, filename in (
-        ("loss", "LeJEPA total loss", "lejepa_total_loss.png"),
-        ("invariance_mse", "LeJEPA invariance loss", "lejepa_invariance_loss.png"),
-        ("sigreg", "LeJEPA SIGReg loss", "lejepa_sigreg_loss.png"),
-    ):
-        fig, axis = plt.subplots(figsize=(8, 4.5))
-        if column in ssl and ssl[column].notna().any():
-            valid = ssl.dropna(subset=[column])
-            axis.plot(valid["epoch"], valid[column], color="#2563eb", linewidth=2)
-        else:
-            axis.text(
-                0.5,
-                0.5,
-                "Not recorded in this SSL checkpoint",
-                ha="center",
-                va="center",
-                transform=axis.transAxes,
-            )
-        axis.set_title(title)
-        axis.set_xlabel("Epoch")
-        axis.set_ylabel(column)
-        axis.grid(alpha=0.25)
+    ssl = history.loc[history.stage == "ssl_pretrain"].copy()
+    if not ssl.empty:
+        ssl["weighted_mse"] = (1 - weight) * ssl["invariance_mse"]
+        ssl["weighted_sigreg"] = weight * ssl["sigreg"]
+        if mean:
+            ssl = ssl.groupby("epoch", as_index=False)[["weighted_mse", "weighted_sigreg", "loss"]].mean()
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        for column, label in (("weighted_mse", "(1-lambda) * MSE"), ("weighted_sigreg", "lambda * SIGReg"), ("loss", "Total loss")):
+            ax.plot(ssl.epoch, ssl[column], label=label)
+        ax.set(xlabel="SSL epoch", ylabel="Weighted loss", title="Self-supervised loss")
+        ax.legend()
+        ax.grid(alpha=0.2)
         fig.tight_layout()
-        fig.savefig(output_dir / filename, dpi=180)
+        fig.savefig(output_dir / "ssl_loss.png", dpi=180)
         plt.close(fig)
-
-    fig, axis = plt.subplots(figsize=(8, 4.5))
-    probes = history[history["stage"] == "frozen_probe"]
-    for target, group in probes.groupby("target", sort=False):
-        group = group.sort_values("epoch")
-        axis.plot(group["epoch"], group["loss"], label=str(target), linewidth=1.5)
-    axis.set_title("Frozen-encoder Probe loss")
-    if not probes.empty:
-        axis.legend(fontsize=8, ncol=2)
-    axis.set_xlabel("Epoch")
-    axis.set_ylabel("Normalized target MSE")
-    axis.grid(alpha=0.25)
+    probe = history.loc[history.stage == "frozen_probe"].copy()
+    if mean and not probe.empty:
+        probe = probe.groupby(["target", "epoch"], as_index=False)["loss"].mean()
+    fig, ax = plt.subplots(figsize=(8, 4.5))
+    for target, group in probe.groupby("target", sort=True):
+        ax.plot(group.epoch, group.loss, label=str(target))
+    if not probe.empty:
+        ax.legend(fontsize=8)
+    ax.set(xlabel="Probe epoch", ylabel="Normalized MSE", title="Regression training loss")
+    ax.grid(alpha=0.2)
     fig.tight_layout()
-    fig.savefig(output_dir / "probe_loss.png", dpi=180)
+    fig.savefig(output_dir / "regression_loss.png", dpi=180)
     plt.close(fig)
-
 
 def plot_first_fold_masks(
     dataset: CanonicalDataset,
@@ -874,7 +860,7 @@ def run_dataset(
                 )
         target_iterator.close()
         histories.extend(fold_histories)
-        plot_fold_losses(fold_histories, asset)
+        plot_fold_losses(fold_histories, asset, args.sigreg_weight)
         assets.append(
             {
                 "dataset": dataset_name,
@@ -892,6 +878,7 @@ def run_dataset(
     pd.DataFrame(rows).to_csv(
         output_dir / "metrics.csv", index=False, encoding="utf-8-sig"
     )
+    plot_fold_losses(histories, output_dir / "figures" / "fold_mean", args.sigreg_weight, mean=True)
     pd.DataFrame(histories).to_csv(
         output_dir / "loss_curve.csv", index=False, encoding="utf-8-sig"
     )
@@ -1097,3 +1084,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

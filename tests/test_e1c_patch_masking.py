@@ -1,4 +1,4 @@
-"""Check E1C token masking, frozen probing, and fold-level data selection."""
+﻿"""Check E1C token masking, frozen probing, and fold-level data selection."""
 
 import json
 import sys
@@ -16,7 +16,7 @@ from models.lejepa.model import SpectralLeJEPA
 from models.shared.backbone import SpectralPatchTransformer
 from models.shared.experiment import build_ssl_encoder
 from models.shared.masking import random_patch_mask
-from scripts import run_e1c
+from scripts import e1c as run_e1c
 
 
 @pytest.fixture(autouse=True)
@@ -234,10 +234,8 @@ def test_e1c_fold_uses_all_spectra_and_per_target_probes(tmp_path, monkeypatch, 
     assert mask_rows.point_end_exclusive.max() == 25
     for asset in (tmp_path / "representations").iterdir():
         for name in (
-            "lejepa_total_loss.png",
-            "lejepa_invariance_loss.png",
-            "lejepa_sigreg_loss.png",
-            "probe_loss.png",
+            "ssl_loss.png",
+            "regression_loss.png",
         ):
             assert (asset / name).is_file()
         metadata = json.loads((asset / "metadata.json").read_text(encoding="utf-8"))

@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import sys
 from pathlib import Path
@@ -200,7 +200,7 @@ def test_prediction_pipeline_parameter_components() -> None:
 
 def test_batch_size_full_parser(monkeypatch) -> None:
     """检查命令行可解析全批量选项。"""
-    from scripts import run_e1a
+    from scripts import e1a as run_e1a
 
     monkeypatch.setattr("sys.argv", ["run_e1a.py", "--batch-size", "full"])
     args = run_e1a.parse_args()
@@ -221,7 +221,7 @@ def test_run_dataset_rejects_single_sample_before_split(tmp_path) -> None:
     """检查单样本数据在交叉验证前被拒绝。"""
     from argparse import Namespace
     from data.dataset_adapters import CanonicalDataset
-    from scripts.run_e1a import run_dataset
+    from scripts.e1a import run_dataset
 
     dataset = CanonicalDataset(
         "tiny", np.array(["s0"]), np.arange(1, 5), np.ones((1, 4)),

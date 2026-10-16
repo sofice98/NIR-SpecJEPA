@@ -1,4 +1,4 @@
-"""Run E1B LeJEPA with a detached online regression probe per target.
+﻿"""Run E1B LeJEPA with a detached online regression probe per target.
 
 The encoder learns from the self-supervised LeJEPA objective while a small
 probe reads detached embeddings. The probe supplies a useful supervised
@@ -131,6 +131,33 @@ def plot_loss_curves(history_rows: list[dict], out_dir: Path, logger: logging.Lo
     logger.info("Generated loss plots: %s", ", ".join(str(item.name) for item in generated))
     return generated
 
+
+def plot_stage_losses(history_rows: list[dict], output_dir: Path, weight: float, *, mean: bool = False) -> None:
+    """Plot the weighted LeJEPA objective and regression loss for a fold or fold mean."""
+    import matplotlib
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame = pd.DataFrame(history_rows)
+    frame["weighted_mse"] = (1 - weight) * frame["invariance_mse"]
+    frame["weighted_sigreg"] = weight * frame["sigreg"]
+    if mean:
+        frame = frame.groupby(["target", "epoch"], as_index=False)[["weighted_mse", "weighted_sigreg", "lejepa_loss", "regression_loss"]].mean()
+    for filename, columns, title in (
+        ("ssl_loss.png", (("weighted_mse", "(1-lambda) * MSE"), ("weighted_sigreg", "lambda * SIGReg"), ("lejepa_loss", "SSL total")), "Self-supervised objective"),
+        ("regression_loss.png", (("regression_loss", "Regression loss"),), "Regression training loss"),
+    ):
+        fig, ax = plt.subplots(figsize=(8, 4.5))
+        for target, group in frame.groupby("target", sort=True):
+            for column, label in columns:
+                ax.plot(group.epoch, group[column], label=f"{target}: {label}")
+        ax.set(xlabel="Epoch", ylabel="Loss", title=title)
+        ax.legend(fontsize=7, ncol=2)
+        ax.grid(alpha=0.2)
+        fig.tight_layout()
+        fig.savefig(output_dir / filename, dpi=180)
+        plt.close(fig)
 
 def parse_batch_size(value: str) -> int | str:
     """解析正整数批量大小或表示全批量的 ``full``。"""
@@ -319,6 +346,106 @@ def joint_lejepa_representation(
     return encoder, state, encode(train_x), encode(test_x), history, parameter_count(model), parameter_count(head)
 
 
+def plot_first_fold_masks(
+    dataset: CanonicalDataset,
+    train_indices: np.ndarray,
+    patch_size: int,
+    mask_ratio: float,
+    seed: int,
+    output_dir: Path,
+) -> None:
+    """Plot three reproducible spectra and the patch tokens hidden in one draw."""
+    import matplotlib
+
+    matplotlib.use("Agg", force=True)
+    import matplotlib.pyplot as plt
+
+    from models.shared.masking import random_patch_mask
+
+    count = min(3, len(train_indices))
+    chosen = np.random.default_rng(seed).choice(
+        train_indices, size=count, replace=False
+    )
+    n_points = dataset.spectra.shape[1]
+    n_patches = (n_points + patch_size - 1) // patch_size
+    masks = random_patch_mask(
+        count,
+        n_patches,
+        mask_ratio,
+        generator=torch.Generator().manual_seed(seed),
+    ).numpy()
+    wavelengths = np.asarray(dataset.wavelengths_nm, dtype=float)
+    boundaries = np.empty(n_points + 1, dtype=float)
+    boundaries[1:-1] = (wavelengths[:-1] + wavelengths[1:]) / 2
+    boundaries[0] = wavelengths[0] - (wavelengths[1] - wavelengths[0]) / 2
+    boundaries[-1] = wavelengths[-1] + (wavelengths[-1] - wavelengths[-2]) / 2
+
+    fig, axes = plt.subplots(count, 1, figsize=(13, 3.1 * count), sharex=True)
+    rows = []
+    axes = np.atleast_1d(axes)
+    for axis, dataset_index, patch_mask in zip(axes, chosen, masks):
+        values = np.asarray(dataset.spectra[dataset_index], dtype=float)
+        point_mask = np.repeat(patch_mask, patch_size)[:n_points]
+        visible = values.copy()
+        visible[point_mask] = np.nan
+        axis.plot(
+            wavelengths, values, color="#64748b", linewidth=1, label="Original spectrum"
+        )
+        axis.plot(
+            wavelengths,
+            visible,
+            color="#2563eb",
+            linewidth=1.2,
+            label="Visible patches",
+        )
+        for patch_index, masked in enumerate(patch_mask):
+            start = patch_index * patch_size
+            stop = min((patch_index + 1) * patch_size, n_points)
+            if masked:
+                axis.axvspan(
+                    boundaries[start],
+                    boundaries[stop],
+                    color="#ef4444",
+                    alpha=0.2,
+                    label=(
+                        "Masked patch interval"
+                        if patch_index == np.flatnonzero(patch_mask)[0]
+                        else None
+                    ),
+                )
+            rows.append(
+                {
+                    "dataset_index": int(dataset_index),
+                    "sample_id": str(dataset.sample_id[dataset_index]),
+                    "patch_index": patch_index,
+                    "point_start": start,
+                    "point_end_exclusive": stop,
+                    "wavelength_start_nm": boundaries[start],
+                    "wavelength_end_nm": boundaries[stop],
+                    "masked": bool(masked),
+                }
+            )
+        axis.set_title(
+            f"Sample {dataset.sample_id[dataset_index]} (row {dataset_index})"
+        )
+        axis.set_ylabel("Original intensity")
+        axis.grid(alpha=0.2)
+        axis.legend(fontsize=8, ncol=3, loc="best")
+    axes[-1].set_xlabel("Wavelength (nm)")
+    fig.suptitle(
+        f"First fold: illustrative patch mask (patch size={patch_size}, ratio={mask_ratio:g})\n"
+        "Shading marks tokens replaced after patch projection; raw values are unchanged.",
+        fontsize=11,
+    )
+    fig.tight_layout()
+    fig.savefig(output_dir / "first_fold_patch_masks.png", dpi=180)
+    plt.close(fig)
+    pd.DataFrame(rows).to_csv(
+        output_dir / "first_fold_patch_masks.csv", index=False, encoding="utf-8-sig"
+    )
+
+
+
 def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Namespace,
                 out_dir: Path, logger: logging.Logger) -> None:
     """逐折、逐目标训练 LeJEPA 与在线探针，并保存结果。"""
@@ -335,7 +462,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
         raise ValueError("at least 2 samples are required for cross-validation")
     folds = pooled_group_balanced_folds(dataset.groups, n_splits=min(args.folds, len(dataset.sample_id)), seed=args.seed)
     # Match E1C's reproducible first-fold patch-mask illustration.
-    from scripts.run_e1c import plot_first_fold_masks
+    
 
     plot_first_fold_masks(
         dataset, folds[0].train_idx, args.patch_size, args.mask_ratio, args.seed, out_dir
@@ -386,6 +513,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
                  "test_samples": len(test_idx), "model_params": model_params,
                  "probe_params": probe_params},
             )
+            plot_stage_losses(fold_history, asset_dir, args.sigreg_weight)
             histories.extend(dict(row, dataset=dataset_name, representation_run_id=run_id) for row in fold_history)
             assets.append({"representation_run_id": run_id, "dataset": dataset_name,
                            "fold": fold.fold, "target": target, "asset_dir": str(asset_dir)})
@@ -426,7 +554,7 @@ def run_dataset(dataset: CanonicalDataset, dataset_name: str, args: argparse.Nam
         )[["train_rmse", "train_r2", "train_rpd", "rmse", "r2", "rpd",
            "train_time_sec", "model_total_params"]].mean()
         aggregate.to_csv(out_dir / "metrics_aggregate.csv", index=False, encoding="utf-8-sig")
-    plot_loss_curves(histories, out_dir, logger)
+    plot_stage_losses(histories, out_dir / "figures" / "fold_mean", args.sigreg_weight, mean=True)
     logger.info("Wrote %d metric rows, %d history rows and %d summaries to %s",
                 len(rows), len(histories), len(summaries), out_dir)
 
@@ -519,3 +647,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
